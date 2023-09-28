@@ -1,0 +1,35 @@
+name: Build and Push
+
+on:
+  schedule:
+    - cron: "0 3 * * 6"
+  push:
+    paths-ignore:
+      - "*.md"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  deploy-docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Docker
+        run: curl -fsSL https://get.docker.com | sh
+
+      - name: Login to image repository
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/lanjelin/docker-remote-desktop:latest

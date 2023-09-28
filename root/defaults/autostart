@@ -1,0 +1,2 @@
+#!/bin/bash
+tint2 -c /app/tint2rc

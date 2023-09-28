@@ -1,0 +1,9 @@
+[Desktop Entry]
+Encoding=UTF-8
+Comment=Access NoMachine computers over the network
+Exec=/app/NX/bin/nxplayer
+Icon=/usr/share/icons/hicolor/48x48/apps/NoMachine-desktop.png
+Name=NoMachine
+StartupWMClass=nxplayer.bin
+Type=Application
+MimeType=application/nx-*
