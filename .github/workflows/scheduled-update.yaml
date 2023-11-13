@@ -1,0 +1,80 @@
+name: Scheduled Update
+
+on:
+  schedule:
+    - cron: "0 3 * * 6"
+  push:
+    paths-ignore:
+      - "**.md"
+      - "**.yaml"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check-releases:
+    runs-on: ubuntu-latest
+      
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      - name: Check versions
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.API_TOKEN }}
+        run: |
+          EXT_RELEASE=$(wget https://downloads.nomachine.com/download/\?id\=4 -q -O - | grep "type=\"hidden\" class=\"details\"" | sed -nE 's/^[^0-9]*(([0-9]+\.)*[0-9]+).*/\1/p')
+          if [ -z "${EXT_RELEASE}" ]; then
+            echo "**** Can't retrieve external release of NoMachine, exiting ****"
+            exit 1
+          fi
+          IMAGE_VERSION=$(cat /mnt/user/data/git/nomachine_docker/Dockerfile | grep 'NOM_VERSION=' | sed -E 's/.*=([^"]+).*/\1/');
+          if [ -z "${IMAGE_VERSION}" ]; then
+            echo "**** Can't retrieve latest pushed version of NoMachine, exiting ****"
+            exit 1
+          fi
+          if [ "${EXT_RELEASE}" == "${IMAGE_VERSION}" ]; then
+            echo "**** Latest version of NoMachine ${EXT_RELEASE} already pushed, exiting ****"
+            exit 0
+          fi
+          if wget -q --method=HEAD https://download.nomachine.com/download/${EXT_RELEASE%.*}/Linux/nomachine_${EXT_RELEASE}_1_x86_64.tar.gz; then
+            echo "**** New version ${EXT_RELEASE} of NoMachine found; old version was ${IMAGE_VERSION}. Triggering update ****"
+            sed -i "s/NOM_VERSION=${IMAGE_VERSION}/NOM_VERSION=${EXT_RELEASE}/g" Dockerfile
+            echo "update=true" >> "$GITHUB_OUTPUT"
+            echo "tag=${EXT_RELEASE}" >> "$GITHUB_OUTPUT"
+          else
+            echo "**** New version ${EXT_RELEASE} found; URL invalid ****"
+            exit 1
+          fi
+          
+      - name: Commit Update
+        id: commit
+        if: 'steps.check.outputs.update'
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add .
+          git commit -m "Update NoMachine to ${{ steps.check.outputs.tag }}"
+          git push
+
+      - name: Install Docker
+        id: dock
+        run: curl -fsSL https://get.docker.com | sh
+        
+      - name: Login to image repository
+        id: login
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+          
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ secrets.REGISTRY_USER }}/docker-remote-desktop:latest
+          labels: maintainer=${{ secrets.REGISTRY_USER }}
