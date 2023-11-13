@@ -28,7 +28,7 @@ jobs:
             echo "**** Can't retrieve external release of NoMachine, exiting ****"
             exit 1
           fi
-          IMAGE_VERSION=$(cat /mnt/user/data/git/nomachine_docker/Dockerfile | grep 'NOM_VERSION=' | sed -E 's/.*=([^"]+).*/\1/');
+          IMAGE_VERSION=$(cat Dockerfile | grep 'NOM_VERSION=' | sed -E 's/.*=([^"]+).*/\1/');
           if [ -z "${IMAGE_VERSION}" ]; then
             echo "**** Can't retrieve latest pushed version of NoMachine, exiting ****"
             exit 1
