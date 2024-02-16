@@ -3,8 +3,8 @@ FROM ghcr.io/linuxserver/baseimage-kasmvnc:ubuntujammy
 LABEL maintainer="lanjelin"
 
 ENV TITLE=Docker-Remote-Desktop
-ENV NOM_VERSION=8.11.3
-	
+ENV NOM_VERSION=8.11.3_1
+
 RUN \
   mkdir -p /app && \
   echo "**** install remmina ****" && \
@@ -27,7 +27,7 @@ RUN \
     wget -q https://builds.parsec.app/package/parsec-linux.deb -O /app/parsec-linux.deb && \
     apt install /app/parsec-linux.deb  && \
   echo "**** install nomachine ****" && \
-    wget -q https://download.nomachine.com/download/${NOM_VERSION%.*}/Linux/nomachine_${NOM_VERSION}_1_x86_64.tar.gz -O /app/nomachine.tar.gz && \
+    wget -q https://download.nomachine.com/download/${NOM_VERSION%.*}/Linux/nomachine_${NOM_VERSION}_x86_64.tar.gz -O /app/nomachine.tar.gz && \
     cd /app && \
     tar -xf nomachine.tar.gz && \
     /app/NX/nxserver --install && \

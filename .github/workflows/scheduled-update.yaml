@@ -23,7 +23,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.API_TOKEN }}
         run: |
-          EXT_RELEASE=$(wget https://downloads.nomachine.com/download/\?id\=4 -q -O - | grep "type=\"hidden\" class=\"details\"" | sed -nE 's/^[^0-9]*(([0-9]+\.)*[0-9]+).*/\1/p')
+          EXT_RELEASE=$(wget https://downloads.nomachine.com/download/\?id\=4 -q -O - | grep "type=\"hidden\" class=\"details\"" | sed -nE 's/^[^0-9]*((([0-9]+\.)*[0-9]+)\_[0-9]{1}).*/\1/p')
           if [ -z "${EXT_RELEASE}" ]; then
             echo "**** Can't retrieve external release of NoMachine, exiting ****"
             exit 1
@@ -37,7 +37,7 @@ jobs:
             echo "**** Latest version of NoMachine ${EXT_RELEASE} already pushed, exiting ****"
             exit 0
           fi
-          if wget -q --method=HEAD https://download.nomachine.com/download/${EXT_RELEASE%.*}/Linux/nomachine_${EXT_RELEASE}_1_x86_64.tar.gz; then
+          if wget -q --method=HEAD https://download.nomachine.com/download/${EXT_RELEASE%.*}/Linux/nomachine_${EXT_RELEASE}_x86_64.tar.gz; then
             echo "**** New version ${EXT_RELEASE} of NoMachine found; old version was ${IMAGE_VERSION}. Triggering update. ****"
             sed -i "s/NOM_VERSION=${IMAGE_VERSION}/NOM_VERSION=${EXT_RELEASE}/g" Dockerfile
             echo "update=true" >> "$GITHUB_OUTPUT"
