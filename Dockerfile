@@ -3,7 +3,7 @@ FROM ghcr.io/linuxserver/baseimage-kasmvnc:ubuntujammy
 LABEL maintainer="lanjelin"
 
 ENV TITLE=Docker-Remote-Desktop
-ENV NOM_VERSION=8.12.12_4
+ENV NOM_VERSION=8.13.1_1
 
 RUN \
   mkdir -p /app && \
