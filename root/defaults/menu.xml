@@ -6,5 +6,6 @@
 <item label="NoMachine" icon="/usr/share/icons/hicolor/48x48/apps/NoMachine-desktop.png"><action name="Execute"><command>/app/NX/bin/nxplayer</command></action></item>
 <item label="Parsec" icon="/usr/share/icons/hicolor/256x256/apps/parsecd.png"><action name="Execute"><command>/usr/bin/parsecd %u</command></action></item>
 <item label="Rustdesk" icon="/usr/share/icons/hicolor/256x256/apps/rustdesk.png"><action name="Execute"><command>/usr/bin/rustdesk</command></action></item>
+<item label="Chromium" icon="/usr/share/icons/hicolor/256x256/apps/chromium.png"><action name="Execute"><command>/usr/bin/wrapped-chromium</command></action></item>
 </menu>
 </openbox_menu>

@@ -9,6 +9,7 @@ ENV RUSTDESK_VERSION=1.3.9
 RUN \
   mkdir -p /app && \
   echo "**** install remmina ****" && \
+    add-apt-repository ppa:xtradeb/apps -y && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
       remmina \
@@ -25,7 +26,8 @@ RUN \
       tint2 \
       libxdo3 \
       gstreamer1.0-pipewire \
-      wget && \
+      wget \
+      chromium && \
   echo "**** install parsec ****" && \
     wget -q https://builds.parsec.app/package/parsec-linux.deb -O /app/parsec-linux.deb && \
     apt install /app/parsec-linux.deb  && \
