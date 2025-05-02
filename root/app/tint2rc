@@ -164,6 +164,7 @@ launcher_tooltip = 1
 launcher_item_app = /usr/share/applications/org.remmina.Remmina.desktop
 launcher_item_app = /app/nxplayer.desktop
 launcher_item_app = /usr/share/applications/parsecd.desktop
+launcher_item_app = /usr/share/applications/rustdesk.desktop
 
 #-------------------------------------
 # Clock

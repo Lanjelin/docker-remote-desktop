@@ -1,2 +1,7 @@
 #!/bin/bash
+
+if [ "$AUTOSTART_RUSTDESK" = "true" ] || [ "$AUTOSTART_RUSTDESK" = "TRUE" ]; then
+  /usr/bin/rustdesk &
+fi
+
 tint2 -c /app/tint2rc

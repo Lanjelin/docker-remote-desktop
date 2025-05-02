@@ -14,6 +14,11 @@ The container comes preinstalled with the following remote desktop software:
  - [NoMachine](https://downloads.nomachine.com/linux/?id=1)     
    - NX
  - [Parsec](https://parsec.app)
+ - [Rustdesk](https://rustdesk.com/)
+
+Under no circumstances expose this container to anything but your local machine, unless you really know what you're doing. External access should be protected behind a reverse proxy with authentication, or behind a VPN.  
+
+The container can be accessed using [Rustdesk Webviewer](https://rustdesk.com/web/) without opening ports, as long as Rustdesk is started, and for this purpose, set the variable `AUTOSTART_RUSTDESK` to `true`.
 
 ## Application Setup
 
@@ -21,6 +26,46 @@ The application can be accessed at:
 
 * http://yourhost:3000/
 * https://yourhost:3001/
+
+## Usage
+
+Some snippets to get you started.
+
+### docker-compose
+
+```yaml
+services:
+  docker-remote-desktop:
+    image: ghcr.io/lanjelin/docker-remote-desktop:latest
+    container_name: docker-remote-desktop
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Oslo
+      - AUTOSTART_RUSTDESK=false
+    ports:
+      - "3000:3000" #http
+      - "3001:3001" #https
+    volumes:
+      - /path/to/config:/config
+    restart: unless-stopped
+```
+
+### docker cli
+
+```bash
+docker run -d \
+  --name=docker-remote-desktop \
+  -e PUID=1000 \
+  -e PGID=1000 \
+  -e TZ=Europe/Oslo \
+  -e AUTOSTART_RUSTDESK=false \
+  -p 3000:3000 \
+  -p 3001:3001 \
+  -v /path/to/config:/config \
+  --restart unless-stopped \
+  ghcr.io/lanjelin/docker-remote-desktop:latest
+```
 
 ### Options in all KasmVNC based GUI containers
 
@@ -52,40 +97,4 @@ This container is based on [Docker Baseimage KasmVNC](https://github.com/linuxse
 
 This container is capable of delivering a true lossless image at a high framerate to your web browser by changing the Stream Quality preset to "Lossless", more information [here](https://www.kasmweb.com/docs/latest/how_to/lossless.html#technical-background). In order to use this mode from a non localhost endpoint the HTTPS port on 3001 needs to be used. If using a reverse proxy to port 3000 specific headers will need to be set as outlined [here](https://github.com/linuxserver/docker-baseimage-kasmvnc#lossless).
 
-## Usage
 
-Some snippets to get you started.
-
-### docker-compose
-
-```yaml
-services:
-  docker-remote-desktop:
-    image: ghcr.io/lanjelin/docker-remote-desktop:latest
-    container_name: docker-remote-desktop
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Oslo
-    ports:
-      - "3000:3000" #http
-      - "3001:3001" #https
-    volumes:
-      - /path/to/config:/config
-    restart: unless-stopped
-```
-
-### docker cli
-
-```bash
-docker run -d \
-  --name=docker-remote-desktop \
-  -e PUID=1000 \
-  -e PGID=1000 \
-  -e TZ=Europe/Oslo \
-  -p 3000:3000 \
-  -p 3001:3001 \
-  -v /path/to/config:/config \
-  --restart unless-stopped \
-  ghcr.io/lanjelin/docker-remote-desktop:latest
-```
