@@ -23,28 +23,57 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.API_TOKEN }}
         run: |
-          EXT_RELEASE=$(wget https://downloads.nomachine.com/download/\?id\=4 -q -O - | grep "type=\"hidden\" class=\"details\"" | sed -nE 's/^[^0-9]*((([0-9]+\.)*[0-9]+)\_[0-9]{1}).*/\1/p')
-          if [ -z "${EXT_RELEASE}" ]; then
+          EXT_NOM=$(wget https://downloads.nomachine.com/download/\?id\=4 -q -O - | grep "type=\"hidden\" class=\"details\"" | sed -nE 's/^[^0-9]*((([0-9]+\.)*[0-9]+)\_[0-9]{1}).*/\1/p')
+          if [ -z "${EXT_NOM}" ]; then
             echo "**** Can't retrieve external release of NoMachine, exiting ****"
             exit 1
           fi
-          IMAGE_VERSION=$(cat Dockerfile | grep 'NOM_VERSION=' | sed -E 's/.*=([^"]+).*/\1/');
-          if [ -z "${IMAGE_VERSION}" ]; then
+          EXT_RDESK=$(curl --silent "https://api.github.com/repos/rustdesk/rustdesk/tags" | grep '"name":' | grep -Eo "[0-9]{1,2}.[0-9]{1,2}.[0-9]{1,2}" | sort -r | head -n1)
+          if [ -z "${EXT_RDESK}" ]; then
+            echo "**** Can't retrieve external release of Rustdesk, exiting ****"
+            exit 1
+          fi
+          IMG_NOM=$(cat Dockerfile | grep 'NOM_VERSION=' | sed -E 's/.*=([^"]+).*/\1/');
+          if [ -z "${IMG_NOM}" ]; then
             echo "**** Can't retrieve latest pushed version of NoMachine, exiting ****"
             exit 1
           fi
-          if [ "${EXT_RELEASE}" == "${IMAGE_VERSION}" ]; then
-            echo "**** Latest version of NoMachine ${EXT_RELEASE} already pushed, exiting ****"
+          IMG_RDESK=$(cat Dockerfile | grep 'RUSTDESK_VERSION=' | sed -E 's/.*=([^"]+).*/\1/');
+          if [ -z "${IMG_RDESK}" ]; then
+            echo "**** Can't retrieve latest pushed version of Rustdesk, exiting ****"
+            exit 1
+          fi
+          if [ "${EXT_NOM}" == "${IMG_NOM}" ] && [ "${EXT_RDESK}" == "${IMG_RDESK}" ]; then
+            echo "**** Latest version of NoMachine ${EXT_NOM} and Rustdesk ${EXT_RDESK} already pushed, exiting ****"
             exit 0
           fi
-          if wget -q --method=HEAD https://download.nomachine.com/download/${EXT_RELEASE%.*}/Linux/nomachine_${EXT_RELEASE}_x86_64.tar.gz; then
-            echo "**** New version ${EXT_RELEASE} of NoMachine found; old version was ${IMAGE_VERSION}. Triggering update. ****"
-            sed -i "s/NOM_VERSION=${IMAGE_VERSION}/NOM_VERSION=${EXT_RELEASE}/g" Dockerfile
-            echo "update=true" >> "$GITHUB_OUTPUT"
-            echo "tag=${EXT_RELEASE}" >> "$GITHUB_OUTPUT"
+          if [ "${EXT_NOM}" != "${IMG_NOM}" ]; then
+            if wget -q --method=HEAD https://download.nomachine.com/download/${EXT_NOM%.*}/Linux/nomachine_${EXT_NOM}_x86_64.tar.gz; then
+              echo "**** New version ${EXT_NOM} of NoMachine found; old version was ${IMG_NOM}. Triggering update. ****"
+              sed -i "s/NOM_VERSION=${IMG_NOM}/NOM_VERSION=${EXT_NOM}/g" Dockerfile
+              echo "update=true" >> "$GITHUB_OUTPUT"
+              echo "nomachine=${EXT_NOM}" >> "$GITHUB_OUTPUT"
+            else
+              echo "**** New version ${EXT_NOM} found; URL invalid ****"
+              echo "nomachine=${IMG_NOM}" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
           else
-            echo "**** New version ${EXT_RELEASE} found; URL invalid ****"
-            exit 1
+            echo "nomachine=${IMG_NOM}" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "${EXT_RDESK}" != "${IMG_RDESK}" ]; then
+            if wget -q --method=HEAD https://github.com/rustdesk/rustdesk/releases/download/${EXT_RDESK}/rustdesk-${EXT_RDESK}-x86_64.deb; then
+              echo "**** New version ${EXT_RDESK} of Rustdesk found; old version was ${IMG_RDESK}. Triggering update. ****"
+              sed -i "s/RUSTDESK_VERSION=${IMG_RDESK}/RUSTDESK_VERSION=${EXT_RDESK}/g" Dockerfile
+              echo "update=true" >> "$GITHUB_OUTPUT"
+              echo "rustdesk=${EXT_RDESK}" >> "$GITHUB_OUTPUT"
+            else
+              echo "**** New version ${EXT_RDESK} found; URL invalid ****"
+              echo "rustdesk=${IMG_RDESK}" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+          else
+            echo "rustdesk=${IMG_RDESK}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Commit Update
@@ -54,11 +83,12 @@ jobs:
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add .
-          git commit -m "Update NoMachine to ${{ steps.check.outputs.tag }}"
+          git commit -m "NoMachine ${{ steps.check.outputs.nomachine }}, Rustdesk ${{ steps.check.outputs.rustdesk }}"
           git push
 
       - name: Login to image repository
         id: login
+        if: 'steps.check.outputs.update'
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
@@ -67,10 +97,13 @@ jobs:
 
       - name: Build and push
         id: push
+        if: 'steps.check.outputs.update'
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
           tags: |
             ghcr.io/${{ secrets.REGISTRY_USER }}/docker-remote-desktop:latest
-          labels: maintainer=${{ secrets.REGISTRY_USER }}
+          labels: |
+            maintainer=${{ secrets.REGISTRY_USER }}
+            org.opencontainers.image.source https://github.com/${{ secrets.REGISTRY_USER }}/docker-remote-desktop
