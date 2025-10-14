@@ -25,28 +25,33 @@ jobs:
         run: |
           set -euo pipefail
 
-          # --- Fetch NoMachine page (session cookies retained like your original) ---
+          # --- Fetch NoMachine (non-enterprise) download page (?id=1) ---
           UA="Mozilla/5.0 (X11; Linux x86_64)"
-          wget -q --save-cookies /tmp/cookies.txt --keep-session-cookies -U "$UA" --max-redirect=10 "https://downloads.nomachine.com/download/?id=4" -O /dev/null
-          PAGE=$(wget -q --load-cookies /tmp/cookies.txt -U "$UA" "https://downloads.nomachine.com/download/?id=4" -O -)
+          wget -q --save-cookies /tmp/cookies.txt --keep-session-cookies -U "$UA" --max-redirect=10 "https://downloads.nomachine.com/download/?id=1" -O /dev/null
+          PAGE=$(wget -q --load-cookies /tmp/cookies.txt -U "$UA" "https://downloads.nomachine.com/download/?id=1" -O -)
 
-          # --- Extract filename, version and suffix from hidden input value ---
-          # Example: value="nomachine_9.1.24_6_x86_64.tar.gz"
-          EXT_NOM_FILE=$(printf '%s' "$PAGE" | sed -nE 's/.*value="(nomachine_([0-9]+\.[0-9]+\.[0-9]+)_([0-9]+)_x86_64\.tar\.gz)".*/\1/p' | head -n1)
-          if [ -z "${EXT_NOM_FILE}" ]; then
-            echo "**** Can't find NoMachine filename in page, exiting ****"
+          # --- Extract full x86_64 tar.gz URL from hidden 'path' inputs ---
+          # Example in PAGE:
+          # <input type="hidden" class="path" value="https://web9001.nomachine.com/download/9.1/Linux/nomachine_9.1.24_6_x86_64.tar.gz">
+          EXT_NOM_URL=$(printf '%s' "$PAGE" \
+            | grep -oE 'https://web[0-9]+\.nomachine\.com/download/[0-9]+\.[0-9]+/Linux/nomachine_[0-9]+\.[0-9]+\.[0-9]+_[0-9]+_x86_64\.tar\.gz' \
+            | head -n1)
+
+          if [ -z "${EXT_NOM_URL}" ]; then
+            echo "**** Can't find NoMachine x86_64 tar.gz URL in ?id=1 page, exiting ****"
             exit 1
           fi
 
-          EXT_NOM=$(printf '%s' "$EXT_NOM_FILE" | sed -nE 's/nomachine_([0-9]+\.[0-9]+\.[0-9]+)_.*/\1/p')
-          EXT_NOM_SUFFIX=$(printf '%s' "$EXT_NOM_FILE" | sed -nE 's/nomachine_[0-9]+\.[0-9]+\.[0-9]+_([0-9]+)_x86_64\.tar\.gz/\1/p')
+          EXT_NOM_FILE=$(basename "$EXT_NOM_URL")  # nomachine_9.1.24_6_x86_64.tar.gz
+          EXT_NOM=$(printf '%s' "$EXT_NOM_FILE" | sed -nE 's/^nomachine_([0-9]+\.[0-9]+\.[0-9]+)_.*/\1/p')  # 9.1.24
+          EXT_NOM_SUFFIX=$(printf '%s' "$EXT_NOM_FILE" | sed -nE 's/^nomachine_[0-9]+\.[0-9]+\.[0-9]+_([0-9]+)_x86_64\.tar\.gz/\1/p')  # 6
 
           if [ -z "${EXT_NOM}" ] || [ -z "${EXT_NOM_SUFFIX}" ]; then
-            echo "**** Failed to parse NoMachine version/suffix, exiting ****"
+            echo "**** Failed to parse NoMachine version/suffix from $EXT_NOM_FILE, exiting ****"
             exit 1
           fi
 
-          # --- RustDesk latest tag ---
+          # --- RustDesk latest tag (unchanged) ---
           EXT_RDESK=$(curl --silent "https://api.github.com/repos/rustdesk/rustdesk/tags" \
             | grep '"name":' \
             | grep -Eo "[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}" \
@@ -71,13 +76,9 @@ jobs:
             exit 1
           fi
 
-          # --- Build the expected URL using the parsed filename on web9001 ---
-          EXT_NOM_DIR=${EXT_NOM%.*} # e.g. 9.1
-          NOM_URL="https://web9001.nomachine.com/download/${EXT_NOM_DIR}/Linux/${EXT_NOM_FILE}"
-
-          # --- Verify URL exists ---
-          if ! wget -q --method=HEAD "${NOM_URL}"; then
-            echo "**** Found NoMachine ${EXT_NOM} (suffix ${EXT_NOM_SUFFIX}) but URL missing: ${NOM_URL} ****"
+          # --- Verify the scraped NoMachine URL exists (HEAD) ---
+          if ! wget -q --method=HEAD "${EXT_NOM_URL}"; then
+            echo "**** Found NoMachine ${EXT_NOM} (suffix ${EXT_NOM_SUFFIX}) but URL missing: ${EXT_NOM_URL} ****"
             echo "nomachine=${IMG_NOM}" >> "$GITHUB_OUTPUT"
             echo "rustdesk=${IMG_RDESK}" >> "$GITHUB_OUTPUT"
             exit 1
@@ -94,7 +95,7 @@ jobs:
 
           # --- Ensure/Update NoMachine suffix (NOM_BUILD_SUFFIX) ---
           if [ -z "${IMG_NOM_SUFFIX}" ]; then
-            # Add the suffix line right after NOM_VERSION
+            # Insert suffix line right after NOM_VERSION
             awk -v suffix="${EXT_NOM_SUFFIX}" '
               BEGIN{added=0}
               {print}
@@ -124,7 +125,7 @@ jobs:
             echo "rustdesk=${IMG_RDESK}" >> "$GITHUB_OUTPUT"
           fi
 
-          # --- Determine outputs for downstream steps ---
+          # --- Outputs for downstream steps ---
           if $UPDATED; then
             echo "update=true" >> "$GITHUB_OUTPUT"
           fi
