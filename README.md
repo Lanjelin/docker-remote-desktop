@@ -1,7 +1,7 @@
 # Docker Remote Desktop
 
 Connect to a variety of different remote desktop services, directly from your browser.  
-Container based on [Docker Baseimage KasmVNC by linuxserver](https://github.com/linuxserver/docker-baseimage-kasmvnc) with [tint2](https://wiki.archlinux.org/title/tint2), to expose a desktop-like environment to your browser.  
+Container based on [Docker Baseimage Selkies by linuxserver](https://github.com/linuxserver/docker-baseimage-selkies) with [tint2](https://wiki.archlinux.org/title/tint2), to expose a desktop-like environment to your browser.  
 
 The container comes preinstalled with the following remote desktop software:  
  - [Remmina](https://remmina.com)
