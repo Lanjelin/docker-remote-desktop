@@ -1,10 +1,10 @@
-# FROM ghcr.io/linuxserver/baseimage-kasmvnc:ubuntujammy
 FROM ghcr.io/linuxserver/baseimage-selkies:ubuntunoble
 
 LABEL maintainer="lanjelin"
 
 ENV TITLE=Docker-Remote-Desktop
 ENV NOM_VERSION=9.1.24
+ENV NOM_BUILD_SUFFIX=6
 ENV RUSTDESK_VERSION=1.4.2
 
 RUN \
@@ -33,7 +33,7 @@ RUN \
     wget -q https://builds.parsec.app/package/parsec-linux.deb -O /app/parsec-linux.deb && \
     apt install /app/parsec-linux.deb  && \
   echo "**** install nomachine ****" && \
-    wget -q https://web9001.nomachine.com/download/${NOM_VERSION%.*}/Linux/nomachine_${NOM_VERSION}_6_x86_64.tar.gz -O /app/nomachine.tar.gz && \
+    wget -q https://web9001.nomachine.com/download/${NOM_VERSION%.*}/Linux/nomachine_${NOM_VERSION}__${NOM_BUILD_SUFFIX}_x86_64.tar.gz -O /app/nomachine.tar.gz && \
     cd /app && \
     tar -xf nomachine.tar.gz && \
     /app/NX/nxserver --install && \

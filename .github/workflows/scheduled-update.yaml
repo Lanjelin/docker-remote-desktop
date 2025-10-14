@@ -23,53 +23,100 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.API_TOKEN }}
         run: |
-          wget -q --save-cookies /tmp/cookies.txt --keep-session-cookies -U "Mozilla/5.0 (X11; Linux x86_64)" --max-redirect=10 "https://downloads.nomachine.com/download/?id=4" -O /dev/null
-          EXT_NOM=$(wget -q --load-cookies /tmp/cookies.txt -U "Mozilla/5.0 (X11; Linux x86_64)" "https://downloads.nomachine.com/download/?id=4" -O - | grep "type=\"hidden\" class=\"details\"" | sed -nE 's/^[^0-9]*(([0-9]+\.)*[0-9]+).*/\1/p' | head -n1)
-          if [ -z "${EXT_NOM}" ]; then
-            echo "**** Can't retrieve external release of NoMachine, exiting ****"
+          set -euo pipefail
+
+          # --- Fetch NoMachine page (session cookies retained like your original) ---
+          UA="Mozilla/5.0 (X11; Linux x86_64)"
+          wget -q --save-cookies /tmp/cookies.txt --keep-session-cookies -U "$UA" --max-redirect=10 "https://downloads.nomachine.com/download/?id=4" -O /dev/null
+          PAGE=$(wget -q --load-cookies /tmp/cookies.txt -U "$UA" "https://downloads.nomachine.com/download/?id=4" -O -)
+
+          # --- Extract filename, version and suffix from hidden input value ---
+          # Example: value="nomachine_9.1.24_6_x86_64.tar.gz"
+          EXT_NOM_FILE=$(printf '%s' "$PAGE" | sed -nE 's/.*value="(nomachine_([0-9]+\.[0-9]+\.[0-9]+)_([0-9]+)_x86_64\.tar\.gz)".*/\1/p' | head -n1)
+          if [ -z "${EXT_NOM_FILE}" ]; then
+            echo "**** Can't find NoMachine filename in page, exiting ****"
             exit 1
           fi
-          EXT_RDESK=$(curl --silent "https://api.github.com/repos/rustdesk/rustdesk/tags" | grep '"name":' | grep -Eo "[0-9]{1,2}.[0-9]{1,2}.[0-9]{1,2}" | sort -r | head -n1)
+
+          EXT_NOM=$(printf '%s' "$EXT_NOM_FILE" | sed -nE 's/nomachine_([0-9]+\.[0-9]+\.[0-9]+)_.*/\1/p')
+          EXT_NOM_SUFFIX=$(printf '%s' "$EXT_NOM_FILE" | sed -nE 's/nomachine_[0-9]+\.[0-9]+\.[0-9]+_([0-9]+)_x86_64\.tar\.gz/\1/p')
+
+          if [ -z "${EXT_NOM}" ] || [ -z "${EXT_NOM_SUFFIX}" ]; then
+            echo "**** Failed to parse NoMachine version/suffix, exiting ****"
+            exit 1
+          fi
+
+          # --- RustDesk latest tag ---
+          EXT_RDESK=$(curl --silent "https://api.github.com/repos/rustdesk/rustdesk/tags" \
+            | grep '"name":' \
+            | grep -Eo "[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{1,2}" \
+            | sort -r \
+            | head -n1)
           if [ -z "${EXT_RDESK}" ]; then
             echo "**** Can't retrieve external release of Rustdesk, exiting ****"
             exit 1
           fi
-          IMG_NOM=$(cat Dockerfile | grep 'NOM_VERSION=' | sed -E 's/.*=([^"]+).*/\1/');
+
+          # --- Read current Dockerfile values ---
+          IMG_NOM=$(grep -E '^ENV[[:space:]]+NOM_VERSION=' Dockerfile | sed -E 's/.*=([^"]+).*/\1/' || true)
+          IMG_NOM_SUFFIX=$(grep -E '^ENV[[:space:]]+NOM_BUILD_SUFFIX=' Dockerfile | sed -E 's/.*=([^"]+).*/\1/' || true)
+          IMG_RDESK=$(grep -E '^ENV[[:space:]]+RUSTDESK_VERSION=' Dockerfile | sed -E 's/.*=([^"]+).*/\1/' || true)
+
           if [ -z "${IMG_NOM}" ]; then
-            echo "**** Can't retrieve latest pushed version of NoMachine, exiting ****"
+            echo "**** Can't retrieve NOM_VERSION from Dockerfile, exiting ****"
             exit 1
           fi
-          IMG_RDESK=$(cat Dockerfile | grep 'RUSTDESK_VERSION=' | sed -E 's/.*=([^"]+).*/\1/');
           if [ -z "${IMG_RDESK}" ]; then
-            echo "**** Can't retrieve latest pushed version of Rustdesk, exiting ****"
+            echo "**** Can't retrieve RUSTDESK_VERSION from Dockerfile, exiting ****"
             exit 1
           fi
-          if [ "${EXT_NOM}" == "${IMG_NOM}" ] && [ "${EXT_RDESK}" == "${IMG_RDESK}" ]; then
-            echo "**** Latest version of NoMachine ${EXT_NOM} and Rustdesk ${EXT_RDESK} already pushed, exiting ****"
-            exit 0
-          fi
-          if [ "${EXT_NOM}" != "${IMG_NOM}" ]; then
-            if wget -q --method=HEAD https://download.nomachine.com/download/${EXT_NOM%.*}/Linux/nomachine_${EXT_NOM}_x86_64.tar.gz; then
-              echo "**** New version ${EXT_NOM} of NoMachine found; old version was ${IMG_NOM}. Triggering update. ****"
-              sed -i "s/NOM_VERSION=${IMG_NOM}/NOM_VERSION=${EXT_NOM}/g" Dockerfile
-              echo "update=true" >> "$GITHUB_OUTPUT"
-              echo "nomachine=${EXT_NOM}" >> "$GITHUB_OUTPUT"
-            else
-              echo "**** New version ${EXT_NOM} found; URL invalid ****"
-              echo "nomachine=${IMG_NOM}" >> "$GITHUB_OUTPUT"
-              exit 1
-            fi
-          else
+
+          # --- Build the expected URL using the parsed filename on web9001 ---
+          EXT_NOM_DIR=${EXT_NOM%.*} # e.g. 9.1
+          NOM_URL="https://web9001.nomachine.com/download/${EXT_NOM_DIR}/Linux/${EXT_NOM_FILE}"
+
+          # --- Verify URL exists ---
+          if ! wget -q --method=HEAD "${NOM_URL}"; then
+            echo "**** Found NoMachine ${EXT_NOM} (suffix ${EXT_NOM_SUFFIX}) but URL missing: ${NOM_URL} ****"
             echo "nomachine=${IMG_NOM}" >> "$GITHUB_OUTPUT"
+            echo "rustdesk=${IMG_RDESK}" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
+
+          UPDATED=false
+
+          # --- Update NoMachine version if needed ---
+          if [ "${EXT_NOM}" != "${IMG_NOM}" ]; then
+            echo "**** New NoMachine version ${EXT_NOM} found (was ${IMG_NOM}) ****"
+            sed -i "s/^ENV[[:space:]]\+NOM_VERSION=.*/ENV NOM_VERSION=${EXT_NOM}/" Dockerfile
+            UPDATED=true
+          fi
+
+          # --- Ensure/Update NoMachine suffix (NOM_BUILD_SUFFIX) ---
+          if [ -z "${IMG_NOM_SUFFIX}" ]; then
+            # Add the suffix line right after NOM_VERSION
+            awk -v suffix="${EXT_NOM_SUFFIX}" '
+              BEGIN{added=0}
+              {print}
+              /^ENV[[:space:]]+NOM_VERSION=/ && !added {print "ENV NOM_BUILD_SUFFIX=" suffix; added=1}
+            ' Dockerfile > Dockerfile.tmp && mv Dockerfile.tmp Dockerfile
+            echo "**** Added NOM_BUILD_SUFFIX=${EXT_NOM_SUFFIX} to Dockerfile ****"
+            UPDATED=true
+          elif [ "${EXT_NOM_SUFFIX}" != "${IMG_NOM_SUFFIX}" ]; then
+            sed -i "s/^ENV[[:space:]]\+NOM_BUILD_SUFFIX=.*/ENV NOM_BUILD_SUFFIX=${EXT_NOM_SUFFIX}/" Dockerfile
+            echo "**** Updated NOM_BUILD_SUFFIX ${IMG_NOM_SUFFIX} -> ${EXT_NOM_SUFFIX} ****"
+            UPDATED=true
+          fi
+
+          # --- RustDesk update check ---
           if [ "${EXT_RDESK}" != "${IMG_RDESK}" ]; then
-            if wget -q --method=HEAD https://github.com/rustdesk/rustdesk/releases/download/${EXT_RDESK}/rustdesk-${EXT_RDESK}-x86_64.deb; then
-              echo "**** New version ${EXT_RDESK} of Rustdesk found; old version was ${IMG_RDESK}. Triggering update. ****"
-              sed -i "s/RUSTDESK_VERSION=${IMG_RDESK}/RUSTDESK_VERSION=${EXT_RDESK}/g" Dockerfile
-              echo "update=true" >> "$GITHUB_OUTPUT"
+            if wget -q --method=HEAD "https://github.com/rustdesk/rustdesk/releases/download/${EXT_RDESK}/rustdesk-${EXT_RDESK}-x86_64.deb"; then
+              echo "**** New Rustdesk ${EXT_RDESK} (was ${IMG_RDESK}) ****"
+              sed -i "s/^ENV[[:space:]]\+RUSTDESK_VERSION=.*/ENV RUSTDESK_VERSION=${EXT_RDESK}/" Dockerfile
+              UPDATED=true
               echo "rustdesk=${EXT_RDESK}" >> "$GITHUB_OUTPUT"
             else
-              echo "**** New version ${EXT_RDESK} found; URL invalid ****"
+              echo "**** New Rustdesk ${EXT_RDESK} found; URL invalid ****"
               echo "rustdesk=${IMG_RDESK}" >> "$GITHUB_OUTPUT"
               exit 1
             fi
@@ -77,10 +124,17 @@ jobs:
             echo "rustdesk=${IMG_RDESK}" >> "$GITHUB_OUTPUT"
           fi
 
+          # --- Determine outputs for downstream steps ---
+          if $UPDATED; then
+            echo "update=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "nomachine=${EXT_NOM}" >> "$GITHUB_OUTPUT"
+
       - name: Commit Update
         id: commit
-        if: 'steps.check.outputs.update'
+        if: steps.check.outputs.update
         run: |
+          set -euo pipefail
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add .
@@ -89,7 +143,7 @@ jobs:
 
       - name: Login to image repository
         id: login
-        if: 'steps.check.outputs.update'
+        if: steps.check.outputs.update
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
@@ -98,7 +152,7 @@ jobs:
 
       - name: Build and push
         id: push
-        if: 'steps.check.outputs.update'
+        if: steps.check.outputs.update
         uses: docker/build-push-action@v4
         with:
           context: .
@@ -107,4 +161,5 @@ jobs:
             ghcr.io/${{ secrets.REGISTRY_USER }}/docker-remote-desktop:latest
           labels: |
             maintainer=${{ secrets.REGISTRY_USER }}
-            org.opencontainers.image.source https://github.com/${{ secrets.REGISTRY_USER }}/docker-remote-desktop
+            org.opencontainers.image.source=https://github.com/${{ secrets.REGISTRY_USER }}/docker-remote-desktop
+
