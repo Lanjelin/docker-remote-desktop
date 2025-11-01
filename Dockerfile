@@ -3,8 +3,8 @@ FROM ghcr.io/linuxserver/baseimage-selkies:ubuntunoble
 LABEL maintainer="lanjelin"
 
 ENV TITLE=Docker-Remote-Desktop
-ENV NOM_VERSION=9.1.24
-ENV NOM_BUILD_SUFFIX=6
+ENV NOM_VERSION=9.2.18
+ENV NOM_BUILD_SUFFIX=3
 ENV RUSTDESK_VERSION=1.4.3
 
 RUN \
