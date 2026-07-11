@@ -3,9 +3,9 @@ FROM ghcr.io/linuxserver/baseimage-selkies:ubuntunoble
 LABEL maintainer="lanjelin"
 
 ENV TITLE=Docker-Remote-Desktop
-ENV NOM_VERSION=9.7.3
+ENV NOM_VERSION=9.8.2
 ENV NOM_BUILD_SUFFIX=1
-ENV RUSTDESK_VERSION=1.4.8
+ENV RUSTDESK_VERSION=1.4.9
 
 RUN \
   mkdir -p /app && \
