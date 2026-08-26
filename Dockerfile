@@ -3,7 +3,7 @@ FROM ghcr.io/linuxserver/baseimage-selkies:ubuntunoble
 LABEL maintainer="lanjelin"
 
 ENV TITLE=Docker-Remote-Desktop
-ENV NOM_VERSION=9.8.2
+ENV NOM_VERSION=10.0.59
 ENV NOM_BUILD_SUFFIX=1
 ENV RUSTDESK_VERSION=1.4.9
 
@@ -33,7 +33,7 @@ RUN \
     wget -q https://builds.parsec.app/package/parsec-linux.deb -O /app/parsec-linux.deb && \
     apt install /app/parsec-linux.deb  && \
   echo "**** install nomachine ****" && \
-    wget -q https://web9001.nomachine.com/download/${NOM_VERSION%.*}/Linux/nomachine_${NOM_VERSION}_${NOM_BUILD_SUFFIX}_x86_64.tar.gz -O /app/nomachine.tar.gz && \
+    wget -q https://web9001.nomachine.com/download/${NOM_VERSION%.*}/Linux/nomachine-personal-edition_${NOM_VERSION}_${NOM_BUILD_SUFFIX}_x86_64.tar.gz -O /app/nomachine.tar.gz && \
     cd /app && \
     tar -xf nomachine.tar.gz && \
     /app/NX/nxserver --install && \
