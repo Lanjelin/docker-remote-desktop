@@ -5,7 +5,7 @@ LABEL maintainer="lanjelin"
 ENV TITLE=Docker-Remote-Desktop
 ENV NOM_VERSION=10.1.7
 ENV NOM_BUILD_SUFFIX=1
-ENV RUSTDESK_VERSION=1.4.9
+ENV RUSTDESK_VERSION=1.5.0
 
 RUN \
   mkdir -p /app && \
