@@ -1,0 +1,5 @@
+#!/bin/bash
+
+if [ "$AUTOSTART_RUSTDESK" = "true" ] || [ "$AUTOSTART_RUSTDESK" = "TRUE" ]; then
+  /usr/bin/rustdesk &
+fi
