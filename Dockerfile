@@ -49,7 +49,8 @@ RUN \
   /var/lib/apt/lists/* \
   /var/tmp/* \
   /app/nomachine.tar.gz \
-  /app/parsec-linux.deb
+  /app/parsec-linux.deb \
+  /etc/apt/apt.conf.d/20packagekit
 
 COPY /root /
 
